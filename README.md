@@ -2,6 +2,9 @@
 
 Watches the [Multi-Rail Payments Observability Platform](https://github.com/Devikat0346/payments-observability-platform) live, and the moment a channel's health degrades, pulls its telemetry and uses an LLM to independently diagnose the likely root cause — without ever being told what the injected fault actually was.
 
+**Live demo:** https://payments-incident-copilot.vercel.app
+**API:** https://payments-incident-copilot-api.fly.dev/api/health
+
 ## Why this exists
 
 MTTD (mean time to detect) and MTTR (mean time to resolve) are the two numbers that matter most in an SRE's day. Detection is usually automatable — an alert fires. Diagnosis is the slower, more human part: an on-call engineer has to look at metrics, cross-reference recent errors, and form a hypothesis before they can even start fixing anything. This project automates that second step: it treats an LLM as a first-pass on-call analyst that turns raw telemetry into a hypothesis in seconds, not minutes.
@@ -79,3 +82,5 @@ npm run dev
 ## Caveats
 
 This is a demonstration of an AI-assisted triage workflow, not a production incident-response tool. Diagnoses come from a general-purpose LLM reasoning over a small telemetry snapshot — they're plausible hypotheses to accelerate a human's first look, not verified findings.
+
+**Known limitation:** a case opens the instant the upstream platform reports a channel as `degraded`, which can be within a second of the underlying fault starting — before enough failed transactions have accumulated in the rolling window to actually show a pattern. In that situation the model correctly reports "no anomaly visible in the data yet" rather than fabricating a cause, which is the right behavior, but it means very fresh incidents sometimes get a low-signal first analysis. A production version would debounce analysis by a few seconds, or re-analyze once more failure data has accumulated.
