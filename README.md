@@ -3,7 +3,7 @@
 Watches the [Multi-Rail Payments Observability Platform](https://github.com/Devikat0346/payments-observability-platform) live, and the moment a channel's health degrades, pulls its telemetry and uses an LLM to independently diagnose the likely root cause — without ever being told what the injected fault actually was.
 
 **Live demo:** https://payments-incident-copilot.vercel.app
-**API:** https://payments-incident-copilot-api.fly.dev/api/health
+**API:** https://payments-incident-copilot-api.onrender.com/api/health
 
 ## Why this exists
 
