@@ -2,7 +2,7 @@
 
 Watches the [Multi-Rail Payments Observability Platform](https://github.com/Devikat0346/payments-observability-platform) live, and the moment a channel's health degrades, pulls its telemetry and uses an LLM to independently diagnose the likely root cause — without ever being told what the injected fault actually was.
 
-**Live demo:** https://payments-platform-theta.vercel.app/incidents (part of the unified [Payments Platform](https://github.com/Devikat0346/payments-platform); this backend's original standalone frontend is still up at https://payments-incident-copilot.vercel.app)
+**Live demo:** https://payments-platform-theta.vercel.app/incidents (part of the unified [Payments Platform](https://github.com/Devikat0346/payments-platform) — this repo is backend-only; its original standalone frontend was retired once the unified one shipped)
 **API:** https://payments-incident-copilot-api.onrender.com/api/health
 
 ## Why this exists
@@ -52,12 +52,11 @@ Switch providers with one env var (`LLM_PROVIDER=ollama|groq`) — no code chang
 ## Tech stack
 
 - **Backend:** Python 3.12, FastAPI, asyncio, httpx (both for polling the upstream platform and for calling the LLM APIs)
-- **Frontend:** Next.js 16 (App Router), TypeScript, Tailwind CSS
 - **LLM:** Llama 3.1 8B via Ollama (local dev) / Llama 3.3 70B via Groq (deploy)
+- **Frontend:** lives in the separate [payments-platform](https://github.com/Devikat0346/payments-platform) repo, deployed on Vercel.
 
 ## Running locally
 
-**Backend:**
 ```bash
 # 1. Install Ollama and pull a model
 brew install ollama
@@ -71,13 +70,7 @@ python3.12 -m venv venv
 ./venv/bin/uvicorn app.main:app --port 8001
 ```
 
-**Frontend:**
-```bash
-cd frontend
-npm install
-# .env.local: NEXT_PUBLIC_API_URL=http://localhost:8001, NEXT_PUBLIC_WS_URL=ws://localhost:8001/ws/live
-npm run dev
-```
+To see it rendered, run the [payments-platform](https://github.com/Devikat0346/payments-platform) frontend locally against this backend (point its `NEXT_PUBLIC_INCIDENTS_API_URL`/`_WS_URL` at `http://localhost:8001` / `ws://localhost:8001/ws/live`).
 
 ## Caveats
 
