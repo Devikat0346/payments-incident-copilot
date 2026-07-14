@@ -1,6 +1,6 @@
 # AI Payments Incident Copilot
 
-Watches the [Multi-Rail Payments Observability Platform](https://github.com/Devikat0346/payments-observability-platform) live, and the moment a channel's health degrades, pulls its telemetry and uses an LLM to independently diagnose the likely root cause — without ever being told what the injected fault actually was.
+Watches the [Multi-Rail Payments Observability Platform](https://github.com/Devikat0346/payments-observability-platform) live — across card, wire (digital, branch, LoanIQ, bulk-batch, IVR), ACH, and Zelle — and the moment a channel's health degrades, pulls its telemetry and uses an LLM to independently diagnose the likely root cause, without ever being told what the injected fault actually was.
 
 **Live demo:** https://payments-platform-theta.vercel.app/incidents (part of the unified [Payments Platform](https://github.com/Devikat0346/payments-platform) — this repo is backend-only; its original standalone frontend was retired once the unified one shipped)
 **API:** https://payments-incident-copilot-api.onrender.com/api/health
