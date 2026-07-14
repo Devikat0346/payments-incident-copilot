@@ -39,14 +39,25 @@ class Poller:
         metrics_resp.raise_for_status()
         summary = metrics_resp.json()
 
+        # Diagnoses are fired concurrently, not one at a time — if several
+        # channels degrade in the same poll tick, awaiting _open_case in a plain
+        # loop would queue their LLM calls behind each other (each ~5-7s), which
+        # would inflate "time to insight" for later channels for no reason other
+        # than iteration order, even though all of them were detected at once.
+        to_open: list[tuple[str, dict]] = []
         for channel, metric in summary["channels"].items():
             is_degraded = metric["health"] in DEGRADED_STATES
             has_open_case = channel in self.state.open_case_by_channel
 
             if is_degraded and not has_open_case:
-                await self._open_case(client, channel, metric)
+                to_open.append((channel, metric))
             elif not is_degraded and has_open_case:
                 await self.state.resolve_case(channel)
+
+        if to_open:
+            await asyncio.gather(
+                *(self._open_case(client, channel, metric) for channel, metric in to_open)
+            )
 
     async def _open_case(self, client: httpx.AsyncClient, channel: str, metric: dict) -> None:
         case = IncidentCase.new(channel=channel, rail=metric["rail"])
