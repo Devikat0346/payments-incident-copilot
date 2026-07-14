@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.poller import Poller
@@ -41,7 +41,7 @@ async def cases(limit: int = 50):
 async def case_detail(case_id: str):
     case = state.cases.get(case_id)
     if not case:
-        return {"error": "not found"}, 404
+        raise HTTPException(status_code=404, detail="not found")
     return case.to_dict()
 
 

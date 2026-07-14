@@ -43,6 +43,10 @@ The LLM call is behind a small provider abstraction (`app/llm_client.py`) rather
 
 Switch providers with one env var (`LLM_PROVIDER=ollama|groq`) — no code changes.
 
+## Evaluating diagnosis quality
+
+`eval/` replays 6 synthetic incidents with known ground truth (a mix of pure latency spikes and failure-rate spikes with distinct causes across card, wire, ACH, and Zelle) through the real model, and scores whether the diagnosis actually engages with the true cause. Latest run: **6/6 correctly diagnosed**, ~6.7s average per diagnosis. See `eval/README.md`.
+
 ## Design decisions
 
 - **The model never sees the injected incident's ground-truth label.** Passing it through would turn "diagnose this" into "repeat this back to me." Only the observable symptoms are passed in.
