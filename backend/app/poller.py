@@ -4,7 +4,7 @@ import logging
 import httpx
 
 from app import config
-from app.llm_client import analyze_incident
+from app.llm_client import LLMRateLimitedError, analyze_incident
 from app.models import IncidentCase
 from app.state import AppState
 
@@ -114,9 +114,16 @@ class Poller:
             case.confidence = result.get("confidence")
             case.recommended_actions = result.get("recommended_actions", [])
             case.severity = result.get("severity")
-        except Exception as exc:
+        except LLMRateLimitedError:
+            logger.exception("analysis rate-limited for case %s", case.id)
+            case.analysis_error = "The LLM provider rate-limited this request. No diagnosis is available for this incident."
+        except Exception:
+            # Never surface a raw exception string here — it ends up rendered
+            # verbatim in the incident UI (request URLs, MDN troubleshooting
+            # links, stack-trace-shaped text), which reads as a broken page
+            # rather than an explained failure.
             logger.exception("analysis failed for case %s", case.id)
-            case.analysis_error = str(exc)
+            case.analysis_error = "AI analysis failed unexpectedly. Check server logs for details."
         finally:
             from app.models import now
 

@@ -3,6 +3,7 @@ import time
 
 import pytest
 
+from app.llm_client import LLMRateLimitedError
 from app.poller import Poller
 from app.state import AppState
 
@@ -93,6 +94,45 @@ async def test_simultaneous_incidents_are_diagnosed_concurrently_not_serially(mo
     assert elapsed < ANALYSIS_DELAY * 2, (
         f"took {elapsed:.2f}s for 3 concurrent diagnoses — looks serial, not concurrent"
     )
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_analysis_stores_clean_message_not_raw_exception(monkeypatch):
+    # Regression test: a raw httpx.HTTPStatusError's text (request URL, MDN
+    # troubleshooting link) used to be stored verbatim in analysis_error and
+    # rendered as-is in the incident UI. It must always be a clean sentence.
+    client = FakeClient({"channels": {"pos": _degraded_metric("pos", "CARD")}})
+
+    async def fake_analyze_incident(context):
+        raise LLMRateLimitedError("Groq rate-limited the request after 3 attempts.")
+
+    monkeypatch.setattr("app.poller.analyze_incident", fake_analyze_incident)
+
+    state = AppState()
+    poller = Poller(state)
+    await poller._poll_once(client)
+
+    case = next(iter(state.cases.values()))
+    assert case.analysis_error == (
+        "The LLM provider rate-limited this request. No diagnosis is available for this incident."
+    )
+
+
+@pytest.mark.asyncio
+async def test_generic_analysis_failure_stores_clean_message_not_raw_exception(monkeypatch):
+    client = FakeClient({"channels": {"pos": _degraded_metric("pos", "CARD")}})
+
+    async def fake_analyze_incident(context):
+        raise ValueError("some internal detail that shouldn't leak to end users")
+
+    monkeypatch.setattr("app.poller.analyze_incident", fake_analyze_incident)
+
+    state = AppState()
+    poller = Poller(state)
+    await poller._poll_once(client)
+
+    case = next(iter(state.cases.values()))
+    assert case.analysis_error == "AI analysis failed unexpectedly. Check server logs for details."
 
 
 @pytest.mark.asyncio

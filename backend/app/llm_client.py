@@ -1,9 +1,23 @@
+import asyncio
 import json
 import re
 
 import httpx
 
 from app import config
+
+GROQ_MAX_ATTEMPTS = 3
+GROQ_BACKOFF_SECONDS = 2.0
+
+
+class LLMRateLimitedError(Exception):
+    """Raised when the LLM provider is still rate-limiting us after retries.
+
+    Kept distinct from a bare httpx.HTTPStatusError so callers can show a
+    clean, honest message instead of the raw exception text (which for a
+    429 includes the full request URL and an MDN troubleshooting link —
+    fine in a log, not fine surfaced verbatim in a case's diagnosis field).
+    """
 
 SYSTEM_PROMPT = """You are an SRE incident analyst embedded in a payments platform's on-call \
 workflow. You are shown live telemetry for one payment origination channel that has just \
@@ -67,20 +81,33 @@ async def _call_groq(user_message: str) -> str:
     if not config.GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set but LLM_PROVIDER=groq.")
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"},
-            json={
-                "model": config.GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                "response_format": {"type": "json_object"},
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        for attempt in range(GROQ_MAX_ATTEMPTS):
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"},
+                json={
+                    "model": config.GROQ_MODEL,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_message},
+                    ],
+                    "response_format": {"type": "json_object"},
+                },
+            )
+            if resp.status_code == 429 and attempt < GROQ_MAX_ATTEMPTS - 1:
+                # The free tier's rate limit is a rolling window, not a
+                # concurrency cap — a short wait and retry usually clears it.
+                # Honor Retry-After when Groq sends one; otherwise back off.
+                retry_after = resp.headers.get("retry-after")
+                delay = float(retry_after) if retry_after else GROQ_BACKOFF_SECONDS * (2**attempt)
+                await asyncio.sleep(delay)
+                continue
+            if resp.status_code == 429:
+                raise LLMRateLimitedError(
+                    f"Groq rate-limited the request after {GROQ_MAX_ATTEMPTS} attempts."
+                )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
 
 
 async def analyze_incident(context: dict) -> dict:
